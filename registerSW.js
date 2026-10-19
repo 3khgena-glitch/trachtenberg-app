@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/trachtenberg-app/sw.js', { scope: '/trachtenberg-app/' })})}
