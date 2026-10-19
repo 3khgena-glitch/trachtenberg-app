@@ -53,7 +53,6 @@ export default function Trainer() {
   const targetStr = '0' + targetNumber.toString();
   const currentStep = inputReversed.length;
 
-  // --- Система звука и вибрации ---
   const playTone = (frequency: number, type: OscillatorType, duration: number) => {
     if (!isSoundEnabled) return;
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -63,7 +62,7 @@ export default function Trainer() {
     const gain = ctx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-    gain.gain.setValueAtTime(0.1, ctx.currentTime); // Громкость 10%
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -73,14 +72,14 @@ export default function Trainer() {
 
   const triggerFeedback = (type: 'correct' | 'error' | 'click') => {
     if (type === 'click') {
-      if (isSoundEnabled) playTone(800, 'sine', 0.05); // Короткий клик
-      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate(10); // Легкая вибрация
+      if (isSoundEnabled) playTone(800, 'sine', 0.05);
+      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate(10);
     } else if (type === 'correct') {
-      if (isSoundEnabled) playTone(600, 'triangle', 0.15); // Приятный динь
-      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate(50); // Успешная вибрация
+      if (isSoundEnabled) playTone(600, 'triangle', 0.15);
+      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate(50);
     } else if (type === 'error') {
-      if (isSoundEnabled) playTone(150, 'sawtooth', 0.3); // Низкий базз
-      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate([100, 50, 100]); // Двойная ошибка
+      if (isSoundEnabled) playTone(150, 'sawtooth', 0.3);
+      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate([100, 50, 100]);
     }
   };
 
@@ -90,7 +89,7 @@ export default function Trainer() {
       return () => clearInterval(timer);
     } else if (isSprintMode && timeLeft === 0 && !isSprintFinished) {
       setIsSprintFinished(true);
-      triggerFeedback('error'); // Звук конца времени
+      triggerFeedback('error');
       if (isDailyChallenge) {
         localStorage.setItem('lastDailyChallenge', new Date().toISOString().split('T')[0]);
       }
@@ -129,7 +128,11 @@ export default function Trainer() {
     setInputReversed((prev) => {
       const newVal = prev + digit;
       if (newVal.length === correctAnswer.length) {
-        const currentInput = newVal.split('').reverse().join('');
+        // УЧИТЫВАЕМ НАПРАВЛЕНИЕ ВВОДА КОРРЕКТНО
+        const currentInput = inputDirection === 'rtl' 
+          ? newVal.split('').reverse().join('') 
+          : newVal;
+
         setSessionAttempts(prevAttempts => prevAttempts + 1);
         
         if (currentInput === correctAnswer) {
