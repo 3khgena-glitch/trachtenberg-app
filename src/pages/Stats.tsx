@@ -1,123 +1,184 @@
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Trash2, ChevronDown, ChevronUp, Calendar, ArrowUpDown } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
-import { ArrowLeft } from 'lucide-react';
-import type { RuleType } from '../store/useStore';
+import { useStore } from '../store/useStore';
 
-// Добавили переводы для новых правил (Сложение и Квадрат)
-const RULE_NAMES: Record<RuleType, string> = {
-  'add': 'Быстрое сложение',
-  'square': 'Возведение в квадрат',
-  'x12': 'Умножение на 12',
-  'x11': 'Умножение на 11',
-  'x9': 'Умножение на 9',
-  'x8': 'Умножение на 8',
-  'x7': 'Умножение на 7',
-  'x6': 'Умножение на 6',
-  'x5': 'Умножение на 5',
-  'x4': 'Умножение на 4',
-  'x3': 'Умножение на 3',
-  'x2': 'Умножение на 2',
+const RULE_LABELS_UK: Record<string, string> = {
+  'add': 'Швидке додавання', 'x12': 'Множення на 12', 'x11': 'Множення на 11', 'x9': 'Множення на 9', 'x8': 'Множення на 8',
+  'x7': 'Множення на 7', 'x6': 'Множення на 6', 'x5': 'Множення на 5', 'x4': 'Множення на 4', 'x3': 'Множення на 3',
+  'x2': 'Множення на 2', 'square': 'Піднесення до квадрата',
 };
+
+const RULE_LABELS_EN: Record<string, string> = {
+  'add': 'Fast Addition', 'x12': 'Multiply by 12', 'x11': 'Multiply by 11', 'x9': 'Multiply by 9', 'x8': 'Multiply by 8',
+  'x7': 'Multiply by 7', 'x6': 'Multiply by 6', 'x5': 'Multiply by 5', 'x4': 'Multiply by 4', 'x3': 'Multiply by 3',
+  'x2': 'Multiply by 2', 'square': 'Squaring',
+};
+
+const RULE_ORDER = ['add', 'x11', 'x12', 'x6', 'x5', 'x9', 'x8', 'x7', 'x4', 'x3', 'x2', 'square'];
 
 export default function Stats() {
   const navigate = useNavigate();
-  const stats = useLiveQuery(() => db.stats.toArray());
+  const { language, ruleSortOrder, setRuleSortOrder } = useStore();
+  const isUk = language === 'uk';
+  
+  const [expandedRule, setExpandedRule] = useState<string | null>(null);
 
-  const groupedStats = (stats || []).reduce((acc, stat) => {
-    if (!acc[stat.rule]) {
-      acc[stat.rule] = { correct: 0, attempts: 0, time: 0 };
+  const rawStats = useLiveQuery(() => db.stats.orderBy('date').reverse().toArray());
+
+  const clearProgress = async () => {
+    if (window.confirm(isUk ? 'Ви впевнені, що хочете видалити всю статистику?' : 'Are you sure you want to clear all statistics?')) {
+      await db.stats.clear();
+      setExpandedRule(null);
     }
-    acc[stat.rule].correct += stat.correctAnswers;
-    acc[stat.rule].attempts += stat.totalAttempts;
-    acc[stat.rule].time += stat.totalTime || 0;
-    return acc;
-  }, {} as Record<string, { correct: number; attempts: number; time: number }>);
+  };
 
-  const displayData = Object.entries(groupedStats).map(([rule, data]) => {
-    const accuracy = data.attempts > 0 ? Math.round((data.correct / data.attempts) * 100) : 0;
-    const avgTime = data.correct > 0 ? (data.time / data.correct / 1000).toFixed(1) : '0';
-    return {
-      rule: rule as RuleType,
-      name: RULE_NAMES[rule as RuleType] || rule,
-      accuracy,
-      avgTime,
-      correct: data.correct,
-      attempts: data.attempts
-    };
-  }).sort((a, b) => a.accuracy - b.accuracy);
-
-  const last7Days = Array.from({length: 7}, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return {
-       dateStr: d.toISOString().split('T')[0],
-       dayName: d.toLocaleDateString('ru-RU', { weekday: 'short' })
-    };
-  });
-
-  const activityMap = (stats || []).reduce((acc, stat) => {
-      const dateStr = stat.date.split('T')[0];
-      acc[dateStr] = (acc[dateStr] || 0) + stat.totalAttempts;
+  const sortedStats = useMemo(() => {
+    if (!rawStats) return [];
+    
+    // Групуємо статистику
+    const grouped = rawStats.reduce((acc, stat) => {
+      if (!acc[stat.rule]) {
+        acc[stat.rule] = { totalAttempts: 0, correctAnswers: 0, totalTime: 0, history: [] };
+      }
+      acc[stat.rule].totalAttempts += stat.totalAttempts;
+      acc[stat.rule].correctAnswers += stat.correctAnswers;
+      acc[stat.rule].totalTime += stat.totalTime || 0;
+      acc[stat.rule].history.push(stat);
       return acc;
-  }, {} as Record<string, number>);
+    }, {} as Record<string, { totalAttempts: number; correctAnswers: number; totalTime: number; history: typeof rawStats }>);
+
+    // Перетворюємо в масив і рахуємо % помилок
+    const statsArray = Object.entries(grouped).map(([ruleId, data]) => {
+      const errorRate = data.totalAttempts > 0 
+        ? Math.round(((data.totalAttempts - data.correctAnswers) / data.totalAttempts) * 100) 
+        : 0;
+      return { ruleId, ...data, errorRate };
+    });
+
+    // Сортуємо
+    return statsArray.sort((a, b) => {
+      if (ruleSortOrder === 'errors') {
+        return b.errorRate - a.errorRate;
+      }
+      // За порядком вивчення
+      return RULE_ORDER.indexOf(a.ruleId) - RULE_ORDER.indexOf(b.ruleId);
+    });
+  }, [rawStats, ruleSortOrder]);
+
+  const toggleRule = (ruleId: string) => {
+    setExpandedRule(prev => prev === ruleId ? null : ruleId);
+  };
+
+  const getRuleName = (ruleId: string) => {
+    return isUk ? (RULE_LABELS_UK[ruleId] || ruleId) : (RULE_LABELS_EN[ruleId] || ruleId);
+  };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-950 text-white p-6">
-      <div className="flex items-center mb-6 mt-4">
-        <button onClick={() => navigate('/')} className="p-2 -ml-2 mr-2 text-gray-400 active:text-white transition-colors">
-          <ArrowLeft size={28} />
+    <div className="flex flex-col min-h-screen bg-gray-950 text-white p-4 sm:p-6 pb-12">
+      <div className="flex items-center justify-between mb-2 mt-4 max-w-md mx-auto w-full">
+        <div className="flex items-center">
+          <button onClick={() => navigate('/')} className="p-2 -ml-2 mr-2 text-gray-400 active:text-white transition-colors">
+            <ArrowLeft size={28} />
+          </button>
+          <h1 className="text-2xl font-bold text-blue-400">{isUk ? 'Статистика' : 'Statistics'}</h1>
+        </div>
+        <button onClick={clearProgress} className="text-red-900/60 hover:text-red-500 active:text-red-400 p-2 transition-colors">
+          <Trash2 size={20} />
         </button>
-        <h1 className="text-2xl font-bold text-blue-400">Детальная статистика</h1>
       </div>
 
-      <div className="flex flex-col gap-4 max-w-xs mx-auto w-full pb-6">
-        
-        <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-[-8px]">Регулярность (7 дней)</h2>
-        <div className="flex justify-between bg-gray-900 p-4 rounded-xl border border-gray-800 mb-2">
-            {last7Days.map(day => (
-                <div key={day.dateStr} className="flex flex-col items-center gap-2">
-                    <span className="text-[10px] text-gray-500 uppercase">{day.dayName}</span>
-                    <div className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold ${activityMap[day.dateStr] ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-800 text-gray-600'}`}>
-                        {activityMap[day.dateStr] || 0}
-                    </div>
-                </div>
-            ))}
-        </div>
+      <div className="flex justify-between items-center mb-4 max-w-md mx-auto w-full">
+        <span className="text-gray-500 text-xs font-semibold uppercase tracking-wider">{isUk ? 'Аналітика вправ' : 'Exercises Analysis'}</span>
+        <button 
+          onClick={() => setRuleSortOrder(ruleSortOrder === 'default' ? 'errors' : 'default')}
+          className="text-xs text-blue-400 active:text-blue-300 transition-colors flex items-center gap-1 font-medium bg-blue-900/20 px-3 py-1.5 rounded-lg"
+        >
+          <ArrowUpDown size={14} />
+          {ruleSortOrder === 'default' ? (isUk ? 'За порядком' : 'Default') : (isUk ? 'За помилками' : 'By Errors')}
+        </button>
+      </div>
 
-        <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-wider mt-2">Слабые места</h2>
-        <p className="text-[10px] text-gray-400 mb-2 leading-tight">
-          Правила отсортированы от самых сложных для вас к самым легким (по точности).
-        </p>
+      <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
+        {sortedStats.map(({ ruleId, ...data }) => {
+          const isExpanded = expandedRule === ruleId;
+          const avgTime = data.correctAnswers > 0 ? (data.totalTime / data.correctAnswers / 1000).toFixed(1) : '-';
+          
+          return (
+            <div key={ruleId} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-lg transition-all">
+              <button 
+                onClick={() => toggleRule(ruleId)} 
+                className="w-full p-4 flex flex-col gap-3 text-left active:bg-gray-800/50 transition-colors relative"
+              >
+                <div className="flex justify-between items-start w-full">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-gray-200 text-lg">{getRuleName(ruleId)}</span>
+                    {ruleSortOrder === 'errors' && data.errorRate > 0 && (
+                      <span className="text-xs text-red-400 mt-1 font-semibold">
+                        {isUk ? `Помилок: ${data.errorRate}%` : `Errors: ${data.errorRate}%`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-gray-500 mt-1">
+                    {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-2 w-full bg-gray-950/50 p-3 rounded-xl border border-gray-800/50">
+                  <div className="flex flex-col items-center">
+                    <span className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-1">
+                      {isUk ? 'Всього' : 'Total'}
+                    </span>
+                    <span className="text-lg font-bold text-gray-300">{data.totalAttempts}</span>
+                  </div>
+                  <div className="flex flex-col items-center border-l border-r border-gray-800">
+                    <span className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-1">
+                      {isUk ? 'Вірно' : 'Correct'}
+                    </span>
+                    <span className="text-lg font-bold text-green-400">{data.correctAnswers}</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-1">
+                      {isUk ? 'Сер. час' : 'Avg Time'}
+                    </span>
+                    <span className="text-lg font-bold text-yellow-400">{avgTime}{avgTime !== '-' && (isUk ? 'с' : 's')}</span>
+                  </div>
+                </div>
+              </button>
 
-        {displayData.length === 0 ? (
-          <div className="text-center text-gray-500 mt-10">Нет данных. Решите пару примеров!</div>
-        ) : (
-          displayData.map((item) => (
-            <div key={item.rule} className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
-              <div className="font-semibold text-lg text-gray-200 border-b border-gray-800 pb-2">
-                {item.name}
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Точность</span>
-                  <span className={`text-xl font-bold ${item.accuracy < 80 ? 'text-red-400' : 'text-blue-400'}`}>
-                    {item.accuracy}%
-                  </span>
+              {isExpanded && (
+                <div className="px-4 pb-4 bg-gray-900 border-t border-gray-800">
+                  <div className="mt-3 flex flex-col gap-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-800">
+                    {data.history.map((stat, i) => (
+                      <div key={i} className="flex justify-between items-center py-2 border-b border-gray-800/50 last:border-0">
+                        <div className="flex items-center gap-2 text-sm text-gray-400">
+                          <Calendar size={14} className="text-blue-500/50" />
+                          {new Date(stat.date).toLocaleDateString(isUk ? 'uk-UA' : 'en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <div className="flex gap-4 text-sm">
+                          <div className="flex items-center gap-1">
+                            <span className="text-green-400 font-medium">{stat.correctAnswers}</span>
+                            <span className="text-gray-600 text-xs">/ {stat.totalAttempts}</span>
+                          </div>
+                          <div className="text-yellow-500 w-10 text-right">
+                            {stat.totalTime > 0 ? (stat.totalTime / 1000).toFixed(1) + (isUk ? 'с' : 's') : '-'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Ср. время</span>
-                  <span className="text-xl font-bold text-yellow-400">{item.avgTime}с</span>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">Решено</span>
-                  <span className="text-xl font-bold text-green-400">
-                    {item.correct} <span className="text-gray-600 text-xs font-medium">/ {item.attempts}</span>
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
-          ))
+          );
+        })}
+
+        {(!rawStats || rawStats.length === 0) && (
+          <div className="text-gray-500 text-center mt-10">
+            {isUk ? 'Ще немає даних для статистики' : 'No statistics data yet'}
+          </div>
         )}
       </div>
     </div>

@@ -1,8 +1,14 @@
 import { create } from 'zustand';
 
 export type RuleType = 'add' | 'x11' | 'x12' | 'x6' | 'x5' | 'x9' | 'x8' | 'x7' | 'x4' | 'x3' | 'x2' | 'square';
+export type Language = 'uk' | 'en';
+export type SortOrder = 'default' | 'errors';
 
 interface AppState {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  ruleSortOrder: SortOrder;
+  setRuleSortOrder: (order: SortOrder) => void;
   inputDirection: 'rtl' | 'ltr';
   setInputDirection: (dir: 'rtl' | 'ltr') => void;
   activeRule: RuleType;
@@ -25,9 +31,15 @@ interface AppState {
   setIsSoundEnabled: (enabled: boolean) => void;
   isVibrationEnabled: boolean;
   setIsVibrationEnabled: (enabled: boolean) => void;
+  unlockedRules: RuleType[];
+  setUnlockedRules: (rules: RuleType[]) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
+  language: 'uk',
+  setLanguage: (lang) => set({ language: lang }),
+  ruleSortOrder: 'default',
+  setRuleSortOrder: (order) => set({ ruleSortOrder: order }),
   inputDirection: 'rtl',
   setInputDirection: (dir) => set({ inputDirection: dir }),
   activeRule: 'add',
@@ -46,8 +58,10 @@ export const useStore = create<AppState>((set) => ({
   setIsAdaptiveMode: (adaptive) => set({ isAdaptiveMode: adaptive }),
   isDailyChallenge: false,
   setIsDailyChallenge: (isDaily) => set({ isDailyChallenge: isDaily }),
-  isSoundEnabled: true, // Звук включен по умолчанию
+  isSoundEnabled: true,
   setIsSoundEnabled: (enabled) => set({ isSoundEnabled: enabled }),
-  isVibrationEnabled: true, // Вибрация включена
+  isVibrationEnabled: true,
   setIsVibrationEnabled: (enabled) => set({ isVibrationEnabled: enabled }),
+  unlockedRules: [],
+  setUnlockedRules: (rules) => set({ unlockedRules: rules }),
 }));
