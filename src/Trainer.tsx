@@ -1,28 +1,118 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import type { RuleType } from './store/useStore';
 import { ArrowLeft, Lightbulb, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { db } from './db';
 
-const RULE_DATA: Record<RuleType, { label: string; multiplier: number; tutorial: string }> = {
-  'add': { label: 'Быстрое сложение', multiplier: 0, tutorial: 'Сложение чисел. Разбивайте на удобные блоки.' },
-  'x12': { label: 'Умножение на 12', multiplier: 12, tutorial: 'Удвойте синюю цифру и прибавьте зеленого соседа.' },
-  'x11': { label: 'Умножение на 11', multiplier: 11, tutorial: 'Сложите синюю цифру с ее зеленым соседом.' },
-  'x9':  { label: 'Умножение на 9',  multiplier: 9, tutorial: 'Первая (справа): из 10. Средние: из 9 + зеленый сосед. Левая: синяя минус 1.' },
-  'x8':  { label: 'Умножение на 8',  multiplier: 8, tutorial: 'Первая: из 10 и удвоить. Средние: из 9, удвоить + зеленый сосед. Левая: синяя минус 2.' },
-  'x7':  { label: 'Умножение на 7',  multiplier: 7, tutorial: 'Удвойте синюю и прибавьте половину зеленого соседа. Если синяя нечетная — +5.' },
-  'x6':  { label: 'Умножение на 6',  multiplier: 6, tutorial: 'К синей прибавьте половину зеленого соседа. Если синяя нечетная — +5.' },
-  'x5':  { label: 'Умножение на 5',  multiplier: 5, tutorial: 'Возьмите половину зеленого соседа. Если синяя нечетная — прибавьте 5.' },
-  'x4':  { label: 'Умножение на 4',  multiplier: 4, tutorial: 'Первая: из 10. Средние: из 9 + половина зеленого соседа (+5 если нечетная). Левая: половина минус 1.' },
-  'x3':  { label: 'Умножение на 3',  multiplier: 3, tutorial: 'Первая: из 10 и удвоить. Средние: из 9, удвоить, + половина зеленого соседа. Левая: половина минус 2.' },
-  'x2':  { label: 'Умножение на 2',  multiplier: 2, tutorial: 'Просто удвойте синюю цифру. Переносите десятки в уме.' },
-  'square': { label: 'Возведение в квадрат', multiplier: 0, tutorial: 'Квадрат числа по методу Трахтенберга: (a^2), (2ab), (b^2).' },
+const RULE_DATA: Record<
+  RuleType,
+  { labelUk: string; labelEn: string; multiplier: number; tutorialUk: string; tutorialEn: string }
+> = {
+  add: {
+    labelUk: 'Швидке додавання',
+    labelEn: 'Fast Addition',
+    multiplier: 0,
+    tutorialUk: 'Додавайте розряд за розрядом справа наліво або розбивайте числа на десятки й одиниці.',
+    tutorialEn: 'Add digit by digit right to left, or split numbers into tens and units.',
+  },
+  x12: {
+    labelUk: 'Множення на 12',
+    labelEn: 'Multiply by 12',
+    multiplier: 12,
+    tutorialUk: 'Подвойте синю цифру та додайте зеленого сусіда.',
+    tutorialEn: 'Double the blue digit and add the green neighbor.',
+  },
+  x11: {
+    labelUk: 'Множення на 11',
+    labelEn: 'Multiply by 11',
+    multiplier: 11,
+    tutorialUk: 'Додайте синю цифру до її зеленого сусіда.',
+    tutorialEn: 'Add the blue digit to its green neighbor.',
+  },
+  x9: {
+    labelUk: 'Множення на 9',
+    labelEn: 'Multiply by 9',
+    multiplier: 9,
+    tutorialUk: 'Перша (справа): від 10. Середні: від 9 + зелений сусід. Ліва (0): зелений сусід мінус 1.',
+    tutorialEn: 'First (right): from 10. Middle: from 9 + green neighbor. Left (0): green neighbor minus 1.',
+  },
+  x8: {
+    labelUk: 'Множення на 8',
+    labelEn: 'Multiply by 8',
+    multiplier: 8,
+    tutorialUk: 'Перша: від 10 і подвоїти. Середні: від 9, подвоїти + зелений сусід. Ліва (0): сусід мінус 2.',
+    tutorialEn: 'First: from 10 and double. Middle: from 9, double + green neighbor. Left (0): neighbor minus 2.',
+  },
+  x7: {
+    labelUk: 'Множення на 7',
+    labelEn: 'Multiply by 7',
+    multiplier: 7,
+    tutorialUk: 'Подвойте синю і додайте половину зеленого сусіда. Якщо синя непарна — додайте 5.',
+    tutorialEn: 'Double the blue digit and add half of the green neighbor. If blue is odd, add 5.',
+  },
+  x6: {
+    labelUk: 'Множення на 6',
+    labelEn: 'Multiply by 6',
+    multiplier: 6,
+    tutorialUk: 'До синьої додайте половину зеленого сусіда. Якщо синя непарна — додайте 5.',
+    tutorialEn: 'Add half of the green neighbor to the blue digit. If blue is odd, add 5.',
+  },
+  x5: {
+    labelUk: 'Множення на 5',
+    labelEn: 'Multiply by 5',
+    multiplier: 5,
+    tutorialUk: 'Візьміть половину зеленого сусіда. Якщо синя непарна — додайте 5.',
+    tutorialEn: 'Take half of the green neighbor. If blue is odd, add 5.',
+  },
+  x4: {
+    labelUk: 'Множення на 4',
+    labelEn: 'Multiply by 4',
+    multiplier: 4,
+    tutorialUk: 'Перша: від 10 (+5 якщо непарна). Середні: від 9 + половина сусіда (+5 якщо непарна). Ліва (0): половина сусіда мінус 1.',
+    tutorialEn: 'First: from 10 (+5 if odd). Middle: from 9 + half neighbor (+5 if odd). Left (0): half neighbor minus 1.',
+  },
+  x3: {
+    labelUk: 'Множення на 3',
+    labelEn: 'Multiply by 3',
+    multiplier: 3,
+    tutorialUk: 'Перша: (10 − цифра)×2 (+5 якщо непарна). Середні: (9 − цифра)×2 + половина сусіда (+5 якщо непарна). Ліва (0): половина мінус 2.',
+    tutorialEn: 'First: (10 − digit)×2 (+5 if odd). Middle: (9 − digit)×2 + half neighbor (+5 if odd). Left (0): half minus 2.',
+  },
+  x2: {
+    labelUk: 'Множення на 2',
+    labelEn: 'Multiply by 2',
+    multiplier: 2,
+    tutorialUk: 'Просто подвойте синю цифру. Переносьте десятки в умі.',
+    tutorialEn: 'Simply double the blue digit and carry tens in your head.',
+  },
+  square: {
+    labelUk: 'Піднесення до квадрата',
+    labelEn: 'Squaring',
+    multiplier: 0,
+    tutorialUk: 'Для числа ab рахуйте справа наліво: b², потім 2×a×b, потім a².',
+    tutorialEn: 'For a number ab, compute right to left: b², then 2×a×b, then a².',
+  },
 };
 
 export default function Trainer() {
   const navigate = useNavigate();
-  const { inputDirection, activeRule, isMixedMode, isSprintMode, sprintDuration, isHighlightEnabled, isAdaptiveMode, isDailyChallenge, isSoundEnabled, isVibrationEnabled } = useStore();
+  const {
+    inputDirection,
+    activeRule,
+    isMixedMode,
+    isSprintMode,
+    sprintDuration,
+    isHighlightEnabled,
+    isAdaptiveMode,
+    isDailyChallenge,
+    isSoundEnabled,
+    isVibrationEnabled,
+    unlockedRules,
+    language,
+  } = useStore();
+
+  const isUk = language === 'uk';
 
   const [currentRuleId, setCurrentRuleId] = useState<RuleType>(activeRule);
   const [targetNumber, setTargetNumber] = useState(0);
@@ -43,31 +133,45 @@ export default function Trainer() {
   const [errorStreak, setErrorStreak] = useState(0);
   const [adaptiveToast, setAdaptiveToast] = useState<'up' | 'down' | null>(null);
 
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const nextTimerRef = useRef<number | null>(null);
+
   const currentRule = RULE_DATA[currentRuleId];
-  
+
   let correctAnswer = '';
   if (currentRuleId === 'add') correctAnswer = (targetNumber + targetNumber2).toString();
   else if (currentRuleId === 'square') correctAnswer = Math.pow(targetNumber, 2).toString();
   else correctAnswer = (targetNumber * currentRule.multiplier).toString();
-  
+
   const targetStr = '0' + targetNumber.toString();
   const currentStep = inputReversed.length;
 
   const playTone = (frequency: number, type: OscillatorType, duration: number) => {
     if (!isSoundEnabled) return;
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + duration);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioCtx();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+    } catch {
+      // Ігноруємо помилки аудіо на обмежених браузерах
+    }
   };
 
   const triggerFeedback = (type: 'correct' | 'error' | 'click') => {
@@ -84,6 +188,15 @@ export default function Trainer() {
   };
 
   useEffect(() => {
+    return () => {
+      if (nextTimerRef.current) window.clearTimeout(nextTimerRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close().catch(() => {});
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (isSprintMode && timeLeft > 0 && !isSprintFinished) {
       const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
       return () => clearInterval(timer);
@@ -94,23 +207,35 @@ export default function Trainer() {
         localStorage.setItem('lastDailyChallenge', new Date().toISOString().split('T')[0]);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSprintMode, timeLeft, isSprintFinished, isDailyChallenge]);
 
   const generateProblem = () => {
+    if (nextTimerRef.current) {
+      window.clearTimeout(nextTimerRef.current);
+      nextTimerRef.current = null;
+    }
+
     let nextRuleId = activeRule;
     if (isMixedMode || isSprintMode) {
-      const ruleKeys = Object.keys(RULE_DATA) as RuleType[];
-      nextRuleId = ruleKeys[Math.floor(Math.random() * ruleKeys.length)];
+      const availableRules: RuleType[] = unlockedRules.length > 0 ? unlockedRules : ['add'];
+      nextRuleId = availableRules[Math.floor(Math.random() * availableRules.length)];
     }
     setCurrentRuleId(nextRuleId);
 
-    const currentDigitCount = useStore.getState().digitCount;
+    let currentDigitCount = useStore.getState().digitCount;
+    if (nextRuleId === 'square') {
+      currentDigitCount = Math.min(currentDigitCount, 3);
+    }
+
     const min = Math.pow(10, currentDigitCount - 1);
     const max = Math.pow(10, currentDigitCount) - 1;
-    
+
     setTargetNumber(Math.floor(Math.random() * (max - min + 1)) + min);
-    if (nextRuleId === 'add') setTargetNumber2(Math.floor(Math.random() * (max - min + 1)) + min);
-    
+    if (nextRuleId === 'add') {
+      setTargetNumber2(Math.floor(Math.random() * (max - min + 1)) + min);
+    }
+
     setInputReversed('');
     setStatus('idle');
     setStartTime(Date.now());
@@ -123,65 +248,85 @@ export default function Trainer() {
 
   const handleKeyPress = (digit: string) => {
     if (status === 'correct' || isSprintFinished) return;
+    if (inputReversed.length >= correctAnswer.length) return;
+
     triggerFeedback('click');
-    
-    setInputReversed((prev) => {
-      const newVal = prev + digit;
-      if (newVal.length === correctAnswer.length) {
-        // УЧИТЫВАЕМ НАПРАВЛЕНИЕ ВВОДА КОРРЕКТНО
-        const currentInput = inputDirection === 'rtl' 
-          ? newVal.split('').reverse().join('') 
-          : newVal;
 
-        setSessionAttempts(prevAttempts => prevAttempts + 1);
-        
-        if (currentInput === correctAnswer) {
-          setStatus('correct');
-          setSessionCorrect(prevCorrect => prevCorrect + 1);
-          setSessionTime(prevTime => prevTime + (Date.now() - startTime));
-          triggerFeedback('correct');
-          
-          if (isAdaptiveMode) {
-            const newStreak = correctStreak + 1;
-            setCorrectStreak(newStreak);
-            setErrorStreak(0);
-            if (newStreak >= 3 && useStore.getState().digitCount < 6) { 
-              useStore.getState().setDigitCount(useStore.getState().digitCount + 1);
-              setCorrectStreak(0);
-              setAdaptiveToast('up');
-              setTimeout(() => setAdaptiveToast(null), 2000);
-            }
-          }
+    const newVal = inputReversed + digit;
+    setInputReversed(newVal);
 
-          if (isMixedMode || isSprintMode) db.stats.add({ rule: currentRuleId, date: new Date().toISOString(), correctAnswers: 1, totalAttempts: 1, totalTime: Date.now() - startTime });
-          setTimeout(generateProblem, isSprintMode ? 400 : 800);
-        } else {
-          setStatus('error');
-          triggerFeedback('error');
-          
-          if (isAdaptiveMode) {
-            const newErrStreak = errorStreak + 1;
-            setErrorStreak(newErrStreak);
+    if (newVal.length === correctAnswer.length) {
+      const currentInput =
+        inputDirection === 'rtl' ? newVal.split('').reverse().join('') : newVal;
+
+      setSessionAttempts((prev) => prev + 1);
+
+      if (currentInput === correctAnswer) {
+        const elapsed = Date.now() - startTime;
+        setStatus('correct');
+        setSessionCorrect((prev) => prev + 1);
+        setSessionTime((prev) => prev + elapsed);
+        triggerFeedback('correct');
+
+        if (isAdaptiveMode) {
+          const newStreak = correctStreak + 1;
+          setCorrectStreak(newStreak);
+          setErrorStreak(0);
+          if (newStreak >= 3 && useStore.getState().digitCount < 5) {
+            useStore.getState().setDigitCount(useStore.getState().digitCount + 1);
             setCorrectStreak(0);
-            if (newErrStreak >= 2 && useStore.getState().digitCount > 2) { 
-              useStore.getState().setDigitCount(useStore.getState().digitCount - 1);
-              setErrorStreak(0);
-              setAdaptiveToast('down');
-              setTimeout(() => setAdaptiveToast(null), 2000);
-            }
+            setAdaptiveToast('up');
+            setTimeout(() => setAdaptiveToast(null), 2000);
           }
-
-          if (isMixedMode || isSprintMode) db.stats.add({ rule: currentRuleId, date: new Date().toISOString(), correctAnswers: 0, totalAttempts: 1, totalTime: 0 });
         }
+
+        if (isMixedMode || isSprintMode) {
+          db.stats.add({
+            rule: currentRuleId,
+            date: new Date().toISOString(),
+            correctAnswers: 1,
+            totalAttempts: 1,
+            totalTime: elapsed,
+          });
+        }
+
+        nextTimerRef.current = window.setTimeout(
+          generateProblem,
+          isSprintMode ? 500 : 1000
+        );
       } else {
-        setStatus('idle');
+        setStatus('error');
+        triggerFeedback('error');
+
+        if (isAdaptiveMode) {
+          const newErrStreak = errorStreak + 1;
+          setErrorStreak(newErrStreak);
+          setCorrectStreak(0);
+          if (newErrStreak >= 2 && useStore.getState().digitCount > 2) {
+            useStore.getState().setDigitCount(useStore.getState().digitCount - 1);
+            setErrorStreak(0);
+            setAdaptiveToast('down');
+            setTimeout(() => setAdaptiveToast(null), 2000);
+          }
+        }
+
+        if (isMixedMode || isSprintMode) {
+          db.stats.add({
+            rule: currentRuleId,
+            date: new Date().toISOString(),
+            correctAnswers: 0,
+            totalAttempts: 1,
+            totalTime: 0,
+          });
+        }
       }
-      return newVal;
-    });
+    } else {
+      setStatus('idle');
+    }
   };
 
   const handleBackspace = () => {
-    if (isSprintFinished) return;
+    if (isSprintFinished || status === 'correct') return;
     triggerFeedback('click');
     setInputReversed((prev) => prev.slice(0, -1));
     setStatus('idle');
@@ -189,67 +334,117 @@ export default function Trainer() {
 
   const handleGoBack = async () => {
     if (sessionAttempts > 0 && !isMixedMode && !isSprintMode) {
-      await db.stats.add({ rule: activeRule, date: new Date().toISOString(), correctAnswers: sessionCorrect, totalAttempts: sessionAttempts, totalTime: sessionTime });
+      await db.stats.add({
+        rule: activeRule,
+        date: new Date().toISOString(),
+        correctAnswers: sessionCorrect,
+        totalAttempts: sessionAttempts,
+        totalTime: sessionTime,
+      });
     }
     navigate('/');
   };
 
-  const displayValue = inputDirection === 'rtl' ? inputReversed.split('').reverse().join('') : inputReversed;
+  const displayValue =
+    inputDirection === 'rtl' ? inputReversed.split('').reverse().join('') : inputReversed;
 
   if (isSprintFinished) {
     return (
       <div className="flex flex-col h-screen bg-gray-950 text-white p-6 justify-center items-center">
-        <h2 className="text-4xl font-bold text-red-500 mb-2">Время вышло!</h2>
-        <p className="text-gray-400 mb-8 uppercase tracking-widest text-sm">{isDailyChallenge ? 'Испытание завершено' : 'Спринт завершен'}</p>
+        <h2 className="text-4xl font-bold text-red-500 mb-2">
+          {isUk ? 'Час вичерпано!' : 'Time is up!'}
+        </h2>
+        <p className="text-gray-400 mb-8 uppercase tracking-widest text-sm">
+          {isDailyChallenge
+            ? isUk
+              ? 'Випробування завершено'
+              : 'Challenge finished'
+            : isUk
+            ? 'Спринт завершено'
+            : 'Sprint finished'}
+        </p>
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-xs mb-8 flex flex-col gap-4 shadow-lg text-center">
           <div>
-            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Решено</div>
+            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">
+              {isUk ? 'Вирішено' : 'Solved'}
+            </div>
             <div className="text-4xl font-bold text-green-400">{sessionCorrect}</div>
           </div>
           <div className="h-px w-full bg-gray-800"></div>
           <div>
-            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Точность</div>
+            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">
+              {isUk ? 'Точність' : 'Accuracy'}
+            </div>
             <div className="text-2xl font-bold text-blue-400">
               {sessionAttempts > 0 ? Math.round((sessionCorrect / sessionAttempts) * 100) : 0}%
             </div>
           </div>
         </div>
-        <button onClick={handleGoBack} className="bg-blue-600 active:bg-blue-700 w-full max-w-xs text-white p-4 rounded-xl text-lg font-bold transition-colors shadow-lg">В меню</button>
+        <button
+          onClick={handleGoBack}
+          className="bg-blue-600 active:bg-blue-700 w-full max-w-xs text-white p-4 rounded-xl text-lg font-bold transition-colors shadow-lg"
+        >
+          {isUk ? 'В меню' : 'Main Menu'}
+        </button>
       </div>
     );
   }
 
   const renderExpression = () => {
+    const len = targetNumber.toString().length;
+    const textSize = len >= 5 ? 'text-4xl' : len === 4 ? 'text-5xl' : 'text-6xl';
+    const gapSize = len >= 5 ? 'gap-1' : 'gap-3';
+
     if (currentRuleId === 'add') {
       return (
-        <div className="flex text-5xl font-bold tracking-widest text-white items-center gap-3">
-          <span>{targetNumber}</span> <span className="text-gray-500 text-4xl">+</span> <span>{targetNumber2}</span>
+        <div className={`flex ${textSize} font-bold tracking-widest text-white items-center ${gapSize}`}>
+          <span>{targetNumber}</span>
+          <span className="text-gray-500 text-4xl">+</span>
+          <span>{targetNumber2}</span>
         </div>
       );
     }
     if (currentRuleId === 'square') {
       return (
-        <div className="flex text-6xl font-bold tracking-widest text-white items-start gap-1">
-          <span>{targetNumber}</span><span className="text-gray-500 text-3xl mt-[-5px]">²</span>
+        <div className={`flex ${textSize} font-bold tracking-widest text-white items-start gap-1`}>
+          <span>{targetNumber}</span>
+          <span className="text-gray-500 text-3xl mt-[-5px]">²</span>
         </div>
       );
     }
     return (
-      <div className="flex text-6xl font-bold tracking-widest text-white items-center gap-3">
+      <div className={`flex ${textSize} font-bold tracking-widest text-white items-center ${gapSize}`}>
         {isHighlightEnabled ? (
           <div className="flex">
             {targetStr.split('').map((char, index) => {
-               const isDone = status === 'correct';
-               const isActive = !isDone && index === targetStr.length - 1 - currentStep;
-               const isNeighbor = !isDone && index === targetStr.length - currentStep;
-               return (
-                 <span key={index} className={`px-1 rounded-lg transition-colors ${isActive ? 'text-blue-400 bg-blue-900/40 border-b-4 border-blue-400' : isNeighbor ? 'text-green-400 bg-green-900/40 border-b-4 border-green-400' : index === 0 && currentStep < targetStr.length - 1 ? 'text-gray-700' : 'text-white border-b-4 border-transparent'}`}>{char}</span>
-               );
+              const isDone = status === 'correct';
+              const isActive = !isDone && index === targetStr.length - 1 - currentStep;
+              const isNeighbor = !isDone && index === targetStr.length - currentStep;
+              return (
+                <span
+                  key={index}
+                  className={`px-1 rounded-lg transition-colors ${
+                    isActive
+                      ? 'text-blue-400 bg-blue-900/40 border-b-4 border-blue-400'
+                      : isNeighbor
+                      ? 'text-green-400 bg-green-900/40 border-b-4 border-green-400'
+                      : index === 0 && currentStep < targetStr.length - 1
+                      ? 'text-gray-700'
+                      : 'text-white border-b-4 border-transparent'
+                  }`}
+                >
+                  {char}
+                </span>
+              );
             })}
           </div>
-        ) : <span>{targetNumber}</span>}
-        <span className="text-gray-500 text-4xl">×</span> 
-        <span className={(isMixedMode || isSprintMode) ? "text-yellow-400" : ""}>{currentRule.multiplier}</span>
+        ) : (
+          <span>{targetNumber}</span>
+        )}
+        <span className="text-gray-500 text-4xl">×</span>
+        <span className={isMixedMode || isSprintMode ? 'text-yellow-400' : ''}>
+          {currentRule.multiplier}
+        </span>
       </div>
     );
   };
@@ -257,21 +452,59 @@ export default function Trainer() {
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-white p-4 justify-between max-w-md mx-auto relative">
       {adaptiveToast && (
-        <div className={`absolute top-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg z-50 animate-bounce ${adaptiveToast === 'up' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-          {adaptiveToast === 'up' ? <><TrendingUp size={18} /> Усложняем!</> : <><TrendingDown size={18} /> Снижаем сложность</>}
+        <div
+          className={`absolute top-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg z-50 animate-bounce ${
+            adaptiveToast === 'up' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+          }`}
+        >
+          {adaptiveToast === 'up' ? (
+            <>
+              <TrendingUp size={18} /> {isUk ? 'Ускладнюємо!' : 'Level up!'}
+            </>
+          ) : (
+            <>
+              <TrendingDown size={18} /> {isUk ? 'Знижуємо складність' : 'Level down'}
+            </>
+          )}
         </div>
       )}
 
       <div className="flex items-center justify-between mt-4">
         <div className="flex items-center text-gray-400 text-sm">
-          <button onClick={handleGoBack} className="p-2 -ml-2 mr-2 text-gray-400 active:text-white transition-colors"><ArrowLeft size={28} /></button>
+          <button
+            onClick={handleGoBack}
+            className="p-2 -ml-2 mr-2 text-gray-400 active:text-white transition-colors"
+          >
+            <ArrowLeft size={28} />
+          </button>
           <span className="text-lg font-medium text-blue-400">
-            {isDailyChallenge ? '🔥 Ежедневное' : isSprintMode ? '⏱ Спринт' : isMixedMode ? '🔀 Смешанный' : currentRule.label}
+            {isDailyChallenge
+              ? isUk
+                ? '🔥 Щоденне'
+                : '🔥 Daily'
+              : isSprintMode
+              ? isUk
+                ? '⏱ Спринт'
+                : '⏱ Sprint'
+              : isMixedMode
+              ? isUk
+                ? '🔀 Змішаний'
+                : '🔀 Mixed'
+              : isUk
+              ? currentRule.labelUk
+              : currentRule.labelEn}
           </span>
         </div>
         {isSprintMode ? (
-          <div className={`flex items-center gap-1 text-sm font-bold px-3 py-1 rounded-full border ${timeLeft <= 10 ? 'bg-red-900/30 text-red-400 border-red-800' : 'bg-gray-900 text-yellow-400 border-gray-800'}`}>
-            <Clock size={14} /> {timeLeft}с
+          <div
+            className={`flex items-center gap-1 text-sm font-bold px-3 py-1 rounded-full border ${
+              timeLeft <= 10
+                ? 'bg-red-900/30 text-red-400 border-red-800'
+                : 'bg-gray-900 text-yellow-400 border-gray-800'
+            }`}
+          >
+            <Clock size={14} /> {timeLeft}
+            {isUk ? 'с' : 's'}
           </div>
         ) : (
           <div className="text-sm font-semibold text-gray-500 bg-gray-900 px-3 py-1 rounded-full border border-gray-800">
@@ -281,32 +514,62 @@ export default function Trainer() {
       </div>
 
       <div className="flex flex-col items-center justify-center flex-grow relative">
-        <div className="flex flex-col items-center mb-10">
-          {renderExpression()}
-        </div>
-        <div className={`text-5xl font-mono h-16 border-b-4 min-w-[220px] text-center mb-6 transition-colors ${status === 'error' ? 'text-red-500 border-red-500' : status === 'correct' ? 'text-green-500 border-green-500' : 'text-blue-400 border-blue-500/50'}`}>
+        <div className="flex flex-col items-center mb-10">{renderExpression()}</div>
+        <div
+          className={`text-5xl font-mono h-16 border-b-4 min-w-[220px] text-center mb-6 transition-colors ${
+            status === 'error'
+              ? 'text-red-500 border-red-500'
+              : status === 'correct'
+              ? 'text-green-500 border-green-500'
+              : 'text-blue-400 border-blue-500/50'
+          }`}
+        >
           {displayValue || <span className="text-gray-700">_</span>}
         </div>
         {!isSprintMode && (
-          <button onClick={() => setShowTutorial(!showTutorial)} className="flex items-center gap-2 text-sm text-yellow-500/80 active:text-yellow-400 transition-colors mb-2">
-            <Lightbulb size={18} /> {showTutorial ? 'Скрыть подсказку' : `Как решать?`}
+          <button
+            onClick={() => setShowTutorial(!showTutorial)}
+            className="flex items-center gap-2 text-sm text-yellow-500/80 active:text-yellow-400 transition-colors mb-2"
+          >
+            <Lightbulb size={18} />{' '}
+            {showTutorial
+              ? isUk
+                ? 'Сховати підказку'
+                : 'Hide hint'
+              : isUk
+              ? 'Як вирішувати?'
+              : 'How to solve?'}
           </button>
         )}
         {showTutorial && !isSprintMode && (
           <div className="absolute top-3/4 bg-gray-900 border border-gray-700 p-4 rounded-xl text-sm text-gray-300 shadow-2xl w-full z-10 leading-relaxed">
-            {currentRule.tutorial}
+            {isUk ? currentRule.tutorialUk : currentRule.tutorialEn}
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-3 gap-3 pb-8 z-0">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-          <button key={num} onClick={() => handleKeyPress(num.toString())} className="bg-gray-800 active:bg-gray-700 text-3xl h-20 rounded-2xl flex items-center justify-center font-semibold shadow-sm transition-transform active:scale-95">{num}</button>
+          <button
+            key={num}
+            onClick={() => handleKeyPress(num.toString())}
+            className="bg-gray-800 active:bg-gray-700 text-3xl h-20 rounded-2xl flex items-center justify-center font-semibold shadow-sm transition-transform active:scale-95"
+          >
+            {num}
+          </button>
         ))}
-        <button onClick={handleBackspace} className="bg-red-900/30 text-red-400 active:bg-red-900/60 text-2xl h-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform active:scale-95">⌫</button>
-        <button onClick={() => handleKeyPress('0')} className="bg-gray-800 active:bg-gray-700 text-3xl h-20 rounded-2xl flex items-center justify-center font-semibold shadow-sm transition-transform active:scale-95">0</button>
-        <button onClick={generateProblem} className="bg-blue-900/30 text-blue-400 active:bg-blue-900/60 text-xl font-medium h-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform active:scale-95">Пропуск</button>
-      </div>
-    </div>
-  );
-}
+        <button
+          onClick={handleBackspace}
+          className="bg-red-900/30 text-red-400 active:bg-red-900/60 text-2xl h-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform active:scale-95"
+        >
+          ⌫
+        </button>
+        <button
+          onClick={() => handleKeyPress('0')}
+          className="bg-gray-800 active:bg-gray-700 text-3xl h-20 rounded-2xl flex items-center justify-center font-semibold shadow-sm transition-transform active:scale-95"
+        >
+          0
+        </button>
+        <button
+          onClick={generateProblem}
+          className="bg-blue-
