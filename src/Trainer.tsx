@@ -152,10 +152,11 @@ export default function Trainer() {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     try {
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new AudioCtx();
+      let ctx = audioCtxRef.current;
+      if (!ctx || ctx.state === 'closed') {
+        ctx = new AudioCtx() as AudioContext;
+        audioCtxRef.current = ctx;
       }
-      const ctx = audioCtxRef.current;
       if (ctx.state === 'suspended') {
         ctx.resume();
       }
@@ -170,7 +171,7 @@ export default function Trainer() {
       osc.start();
       osc.stop(ctx.currentTime + duration);
     } catch {
-      // Ігноруємо помилки аудіо на обмежених браузерах
+      // Ignore audio errors on restricted browsers
     }
   };
 
@@ -572,4 +573,11 @@ export default function Trainer() {
         </button>
         <button
           onClick={generateProblem}
-          className="bg-blue-
+          className="bg-blue-900/30 text-blue-400 active:bg-blue-900/60 text-xl font-medium h-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform active:scale-95"
+        >
+          {isUk ? 'Пропуск' : 'Skip'}
+        </button>
+      </div>
+    </div>
+  );
+}
