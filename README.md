@@ -1,32 +1,61 @@
-# React + TypeScript + Vite
+# 🧮 Рахуємо в умі — Тренажер за методом Трахтенберга
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Веб-додаток (PWA) для тренування швидкої усної лічби за системою Якова Трахтенберга. Оптимізований для смартфонів (iPhone / Android) та працює офлайн.
 
-Currently, two official plugins are available:
+👉 **Відкрити додаток:** https://3khgena-glitch.github.io/trachtenberg-app/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## ✨ Основні можливості
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **📖 Звід правил (Теорія)** — повний довідник алгоритмів методу Трахтенберга з поясненнями та прикладами для новачків.
+- **🌳 Дерево навичок** — 12 правил від простого до складного: швидке додавання, множення на 11, 12, 6, 5, 9, 8, 7, 4, 3, 2 та піднесення до квадрата. Наступне правило відкривається після мінімум 10 правильних відповідей із точністю від 80%.
+- **🎯 Режими тренування:**
+  - *Тематична практика* — відпрацювання одного обраного правила.
+  - *Змішаний режим* — випадкові приклади лише з уже відкритих правил.
+  - *Спринт* — розв’язання максимальної кількості прикладів за 30, 60 або 120 секунд.
+  - *Щоденне випробування* — коротка щоденна сесія для підтримки навички.
+- **⌨️ Кастомний нумпад та ввід справа наліво** — вбудована цифрова клавіатура (не викликає системну клавіатуру смартфона) з підтримкою введення **справа наліво** (за Трахтенбергом) або **зліва направо** (класичний режим).
+- **💡 Візуальна підсвітка кроків** — покрокове виділення поточної цифри (синім) та її правого сусіда (зеленим) із уявним нулем зліва.
+- **📈 Адаптивна складність** — автоматичне підвищення або зниження кількості цифр у прикладі залежно від серії відповідей (або ручний вибір розрядності в налаштуваннях).
+- **📊 Офлайн-статистика** — підрахунок точності, середнього часу відповіді, історія по днях та аналіз слабких місць (зберігається локально в IndexedDB).
+- **⚙️ Налаштування та локалізація** — перемикання мови (**Українська / English**), звук (Web Audio API), вібрація та автоматичне збереження параметрів.
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## 📱 Встановлення на телефон (PWA)
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+### iPhone (Safari)
+1. Відкрий посилання https://3khgena-glitch.github.io/trachtenberg-app/ у браузері **Safari**.
+2. Натисни кнопку **«Поділитися»** (квадрат зі стрілкою вгору).
+3. Обери **«На екран «Домой»»** (*Add to Home Screen*) і натисни **«Додати»**.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+### Android (Chrome)
+1. Відкрий посилання у **Chrome**.
+2. Натисни меню (три крапки) → **«Додати на головний екран»** (*Install app*).
+
+---
+
+## 🛠 Технології
+
+- **React + TypeScript + Vite**
+- **Tailwind CSS** — стилізація та адаптивний темний інтерфейс
+- **React Router (`HashRouter`)** — навігація, сумісна з GitHub Pages
+- **Zustand (`persist`)** — керування станом і збереження налаштувань у `localStorage`
+- **Dexie.js (IndexedDB)** — локальна база даних для статистики
+- **Lucide React** — іконки
+- **vite-plugin-pwa** — підтримка PWA та офлайн-роботи
+
+---
+
+## 📁 Структура проєкту
+
+```text
+src/
+├── pages/
+│   ├── Home.tsx        # Головне меню, зведена статистика та дерево навичок
+│   ├── Theory.tsx      # Загальний звід правил методу Трахтенберга
+│   ├── Stats.tsx       # Детальна статистика, історія по днях і слабкі місця
+│   └── Settings.tsx    # Налаштування (мова, ввід, складність, звук, скидання)
+├── store/
+│
