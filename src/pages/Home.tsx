@@ -115,7 +115,7 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center h-screen bg-gray-950 text-white p-6 py-6 overflow-hidden">
       <h1 className="text-3xl font-bold mb-1 text-center text-blue-400 shrink-0">
-        {isUk ? 'Усна лічба' : 'Mental Math'}
+       {isUk ? 'Рахуємо в умі' : 'Mental Math'}
       </h1>
       <p className="text-gray-400 mb-4 tracking-widest text-xs uppercase shrink-0">
         {isUk ? 'Метод Трахтенберга' : 'Trachtenberg Method'}
