@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { RuleType } from '../data/rules';
 
-export type RuleType = 'add' | 'x11' | 'x12' | 'x6' | 'x5' | 'x9' | 'x8' | 'x7' | 'x4' | 'x3' | 'x2' | 'square';
+export type { RuleType };
 export type Language = 'uk' | 'en';
 export type SortOrder = 'default' | 'errors';
 
@@ -65,22 +66,23 @@ export const useStore = create<AppState>()(
       setIsSoundEnabled: (enabled) => set({ isSoundEnabled: enabled }),
       isVibrationEnabled: true,
       setIsVibrationEnabled: (enabled) => set({ isVibrationEnabled: enabled }),
-      unlockedRules: [],
+      unlockedRules: ['add'],
       setUnlockedRules: (rules) => set({ unlockedRules: rules }),
     }),
     {
       name: 'trachtenberg-settings',
-      // Зберігаємо тільки постійні налаштування користувача
       partialize: (state) => ({
         language: state.language,
         ruleSortOrder: state.ruleSortOrder,
         inputDirection: state.inputDirection,
+        activeRule: state.activeRule,
         digitCount: state.digitCount,
         sprintDuration: state.sprintDuration,
         isHighlightEnabled: state.isHighlightEnabled,
         isAdaptiveMode: state.isAdaptiveMode,
         isSoundEnabled: state.isSoundEnabled,
         isVibrationEnabled: state.isVibrationEnabled,
+        unlockedRules: state.unlockedRules,
       }),
     }
   )
