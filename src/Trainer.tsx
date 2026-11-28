@@ -1,99 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
-import type { RuleType } from './store/useStore';
+import { RULE_MAP, type RuleType } from './data/rules';
 import { ArrowLeft, Lightbulb, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { db } from './db';
-
-const RULE_DATA: Record<
-  RuleType,
-  { labelUk: string; labelEn: string; multiplier: number; tutorialUk: string; tutorialEn: string }
-> = {
-  add: {
-    labelUk: 'Швидке додавання',
-    labelEn: 'Fast Addition',
-    multiplier: 0,
-    tutorialUk: 'Додавайте розряд за розрядом справа наліво або розбивайте числа на десятки й одиниці.',
-    tutorialEn: 'Add digit by digit right to left, or split numbers into tens and units.',
-  },
-  x12: {
-    labelUk: 'Множення на 12',
-    labelEn: 'Multiply by 12',
-    multiplier: 12,
-    tutorialUk: 'Подвойте синю цифру та додайте зеленого сусіда.',
-    tutorialEn: 'Double the blue digit and add the green neighbor.',
-  },
-  x11: {
-    labelUk: 'Множення на 11',
-    labelEn: 'Multiply by 11',
-    multiplier: 11,
-    tutorialUk: 'Додайте синю цифру до її зеленого сусіда.',
-    tutorialEn: 'Add the blue digit to its green neighbor.',
-  },
-  x9: {
-    labelUk: 'Множення на 9',
-    labelEn: 'Multiply by 9',
-    multiplier: 9,
-    tutorialUk: 'Перша (справа): від 10. Середні: від 9 + зелений сусід. Ліва (0): зелений сусід мінус 1.',
-    tutorialEn: 'First (right): from 10. Middle: from 9 + green neighbor. Left (0): green neighbor minus 1.',
-  },
-  x8: {
-    labelUk: 'Множення на 8',
-    labelEn: 'Multiply by 8',
-    multiplier: 8,
-    tutorialUk: 'Перша: від 10 і подвоїти. Середні: від 9, подвоїти + зелений сусід. Ліва (0): сусід мінус 2.',
-    tutorialEn: 'First: from 10 and double. Middle: from 9, double + green neighbor. Left (0): neighbor minus 2.',
-  },
-  x7: {
-    labelUk: 'Множення на 7',
-    labelEn: 'Multiply by 7',
-    multiplier: 7,
-    tutorialUk: 'Подвойте синю і додайте половину зеленого сусіда. Якщо синя непарна — додайте 5.',
-    tutorialEn: 'Double the blue digit and add half of the green neighbor. If blue is odd, add 5.',
-  },
-  x6: {
-    labelUk: 'Множення на 6',
-    labelEn: 'Multiply by 6',
-    multiplier: 6,
-    tutorialUk: 'До синьої додайте половину зеленого сусіда. Якщо синя непарна — додайте 5.',
-    tutorialEn: 'Add half of the green neighbor to the blue digit. If blue is odd, add 5.',
-  },
-  x5: {
-    labelUk: 'Множення на 5',
-    labelEn: 'Multiply by 5',
-    multiplier: 5,
-    tutorialUk: 'Візьміть половину зеленого сусіда. Якщо синя непарна — додайте 5.',
-    tutorialEn: 'Take half of the green neighbor. If blue is odd, add 5.',
-  },
-  x4: {
-    labelUk: 'Множення на 4',
-    labelEn: 'Multiply by 4',
-    multiplier: 4,
-    tutorialUk: 'Перша: від 10 (+5 якщо непарна). Середні: від 9 + половина сусіда (+5 якщо непарна). Ліва (0): половина сусіда мінус 1.',
-    tutorialEn: 'First: from 10 (+5 if odd). Middle: from 9 + half neighbor (+5 if odd). Left (0): half neighbor minus 1.',
-  },
-  x3: {
-    labelUk: 'Множення на 3',
-    labelEn: 'Multiply by 3',
-    multiplier: 3,
-    tutorialUk: 'Перша: (10 − цифра)×2 (+5 якщо непарна). Середні: (9 − цифра)×2 + половина сусіда (+5 якщо непарна). Ліва (0): половина мінус 2.',
-    tutorialEn: 'First: (10 − digit)×2 (+5 if odd). Middle: (9 − digit)×2 + half neighbor (+5 if odd). Left (0): half minus 2.',
-  },
-  x2: {
-    labelUk: 'Множення на 2',
-    labelEn: 'Multiply by 2',
-    multiplier: 2,
-    tutorialUk: 'Просто подвойте синю цифру. Переносьте десятки в умі.',
-    tutorialEn: 'Simply double the blue digit and carry tens in your head.',
-  },
-  square: {
-    labelUk: 'Піднесення до квадрата',
-    labelEn: 'Squaring',
-    multiplier: 0,
-    tutorialUk: 'Для числа ab рахуйте справа наліво: b², потім 2×a×b, потім a².',
-    tutorialEn: 'For a number ab, compute right to left: b², then 2×a×b, then a².',
-  },
-};
 
 export default function Trainer() {
   const navigate = useNavigate();
@@ -124,7 +34,6 @@ export default function Trainer() {
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionAttempts, setSessionAttempts] = useState(0);
   const [startTime, setStartTime] = useState<number>(0);
-  const [sessionTime, setSessionTime] = useState<number>(0);
 
   const [timeLeft, setTimeLeft] = useState(isDailyChallenge ? 60 : sprintDuration);
   const [isSprintFinished, setIsSprintFinished] = useState(false);
@@ -136,7 +45,7 @@ export default function Trainer() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const nextTimerRef = useRef<number | null>(null);
 
-  const currentRule = RULE_DATA[currentRuleId];
+  const currentRule = RULE_MAP[currentRuleId];
 
   let correctAnswer = '';
   if (currentRuleId === 'add') correctAnswer = (targetNumber + targetNumber2).toString();
@@ -266,7 +175,6 @@ export default function Trainer() {
         const elapsed = Date.now() - startTime;
         setStatus('correct');
         setSessionCorrect((prev) => prev + 1);
-        setSessionTime((prev) => prev + elapsed);
         triggerFeedback('correct');
 
         if (isAdaptiveMode) {
@@ -281,15 +189,13 @@ export default function Trainer() {
           }
         }
 
-        if (isMixedMode || isSprintMode) {
-          db.stats.add({
-            rule: currentRuleId,
-            date: new Date().toISOString(),
-            correctAnswers: 1,
-            totalAttempts: 1,
-            totalTime: elapsed,
-          });
-        }
+        db.stats.add({
+          rule: currentRuleId,
+          date: new Date().toISOString(),
+          correctAnswers: 1,
+          totalAttempts: 1,
+          totalTime: elapsed,
+        });
 
         nextTimerRef.current = window.setTimeout(
           generateProblem,
@@ -311,15 +217,13 @@ export default function Trainer() {
           }
         }
 
-        if (isMixedMode || isSprintMode) {
-          db.stats.add({
-            rule: currentRuleId,
-            date: new Date().toISOString(),
-            correctAnswers: 0,
-            totalAttempts: 1,
-            totalTime: 0,
-          });
-        }
+        db.stats.add({
+          rule: currentRuleId,
+          date: new Date().toISOString(),
+          correctAnswers: 0,
+          totalAttempts: 1,
+          totalTime: 0,
+        });
       }
     } else {
       setStatus('idle');
@@ -333,16 +237,7 @@ export default function Trainer() {
     setStatus('idle');
   };
 
-  const handleGoBack = async () => {
-    if (sessionAttempts > 0 && !isMixedMode && !isSprintMode) {
-      await db.stats.add({
-        rule: activeRule,
-        date: new Date().toISOString(),
-        correctAnswers: sessionCorrect,
-        totalAttempts: sessionAttempts,
-        totalTime: sessionTime,
-      });
-    }
+  const handleGoBack = () => {
     navigate('/');
   };
 
