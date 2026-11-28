@@ -1,9 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import { RULE_MAP, type RuleType } from './data/rules';
 import { ArrowLeft, Lightbulb, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { db } from './db';
+
+const ADAPTIVE_STREAK_UP = 3;
+const ADAPTIVE_STREAK_DOWN = 2;
+const MIN_DIGIT_COUNT = 2;
+const MAX_DIGIT_COUNT = 5;
+const MAX_SQUARE_DIGITS = 3;
 
 export default function Trainer() {
   const navigate = useNavigate();
@@ -44,6 +50,7 @@ export default function Trainer() {
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const nextTimerRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   const currentRule = RULE_MAP[currentRuleId];
 
@@ -55,51 +62,59 @@ export default function Trainer() {
   const targetStr = '0' + targetNumber.toString();
   const currentStep = inputReversed.length;
 
-  const playTone = (frequency: number, type: OscillatorType, duration: number) => {
-    if (!isSoundEnabled) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    try {
-      let ctx = audioCtxRef.current;
-      if (!ctx || ctx.state === 'closed') {
-        ctx = new AudioCtx() as AudioContext;
-        audioCtxRef.current = ctx;
+  const playTone = useCallback(
+    (frequency: number, type: OscillatorType, duration: number) => {
+      if (!isSoundEnabled) return;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      try {
+        let ctx = audioCtxRef.current;
+        if (!ctx || ctx.state === 'closed') {
+          ctx = new AudioCtx();
+          audioCtxRef.current = ctx;
+        }
+        if (ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch {
+        // Ignore audio errors on restricted browsers
       }
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + duration);
-    } catch {
-      // Ignore audio errors on restricted browsers
-    }
-  };
+    },
+    [isSoundEnabled]
+  );
 
-  const triggerFeedback = (type: 'correct' | 'error' | 'click') => {
-    if (type === 'click') {
-      if (isSoundEnabled) playTone(800, 'sine', 0.05);
-      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate(10);
-    } else if (type === 'correct') {
-      if (isSoundEnabled) playTone(600, 'triangle', 0.15);
-      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate(50);
-    } else if (type === 'error') {
-      if (isSoundEnabled) playTone(150, 'sawtooth', 0.3);
-      if (isVibrationEnabled && navigator.vibrate) navigator.vibrate([100, 50, 100]);
-    }
-  };
+  const triggerFeedback = useCallback(
+    (type: 'correct' | 'error' | 'click') => {
+      if (type === 'click') {
+        if (isSoundEnabled) playTone(800, 'sine', 0.05);
+        if (isVibrationEnabled && navigator.vibrate) navigator.vibrate(10);
+      } else if (type === 'correct') {
+        if (isSoundEnabled) playTone(600, 'triangle', 0.15);
+        if (isVibrationEnabled && navigator.vibrate) navigator.vibrate(50);
+      } else if (type === 'error') {
+        if (isSoundEnabled) playTone(150, 'sawtooth', 0.3);
+        if (isVibrationEnabled && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      }
+    },
+    [isSoundEnabled, isVibrationEnabled, playTone]
+  );
 
   useEffect(() => {
     return () => {
       if (nextTimerRef.current) window.clearTimeout(nextTimerRef.current);
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
       if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
         audioCtxRef.current.close().catch(() => {});
       }
@@ -117,10 +132,9 @@ export default function Trainer() {
         localStorage.setItem('lastDailyChallenge', new Date().toISOString().split('T')[0]);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSprintMode, timeLeft, isSprintFinished, isDailyChallenge]);
+  }, [isSprintMode, timeLeft, isSprintFinished, isDailyChallenge, triggerFeedback]);
 
-  const generateProblem = () => {
+  const generateProblem = useCallback(() => {
     if (nextTimerRef.current) {
       window.clearTimeout(nextTimerRef.current);
       nextTimerRef.current = null;
@@ -135,7 +149,7 @@ export default function Trainer() {
 
     let currentDigitCount = useStore.getState().digitCount;
     if (nextRuleId === 'square') {
-      currentDigitCount = Math.min(currentDigitCount, 3);
+      currentDigitCount = Math.min(currentDigitCount, MAX_SQUARE_DIGITS);
     }
 
     const min = Math.pow(10, currentDigitCount - 1);
@@ -149,12 +163,17 @@ export default function Trainer() {
     setInputReversed('');
     setStatus('idle');
     setStartTime(Date.now());
-  };
+  }, [activeRule, isMixedMode, isSprintMode, unlockedRules]);
 
   useEffect(() => {
     generateProblem();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [generateProblem]);
+
+  const showToast = (direction: 'up' | 'down') => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    setAdaptiveToast(direction);
+    toastTimerRef.current = window.setTimeout(() => setAdaptiveToast(null), 2000);
+  };
 
   const handleKeyPress = (digit: string) => {
     if (status === 'correct' || isSprintFinished) return;
@@ -181,11 +200,13 @@ export default function Trainer() {
           const newStreak = correctStreak + 1;
           setCorrectStreak(newStreak);
           setErrorStreak(0);
-          if (newStreak >= 3 && useStore.getState().digitCount < 5) {
+          if (
+            newStreak >= ADAPTIVE_STREAK_UP &&
+            useStore.getState().digitCount < MAX_DIGIT_COUNT
+          ) {
             useStore.getState().setDigitCount(useStore.getState().digitCount + 1);
             setCorrectStreak(0);
-            setAdaptiveToast('up');
-            setTimeout(() => setAdaptiveToast(null), 2000);
+            showToast('up');
           }
         }
 
@@ -209,11 +230,13 @@ export default function Trainer() {
           const newErrStreak = errorStreak + 1;
           setErrorStreak(newErrStreak);
           setCorrectStreak(0);
-          if (newErrStreak >= 2 && useStore.getState().digitCount > 2) {
+          if (
+            newErrStreak >= ADAPTIVE_STREAK_DOWN &&
+            useStore.getState().digitCount > MIN_DIGIT_COUNT
+          ) {
             useStore.getState().setDigitCount(useStore.getState().digitCount - 1);
             setErrorStreak(0);
-            setAdaptiveToast('down');
-            setTimeout(() => setAdaptiveToast(null), 2000);
+            showToast('down');
           }
         }
 
@@ -369,6 +392,7 @@ export default function Trainer() {
         <div className="flex items-center text-gray-400 text-sm">
           <button
             onClick={handleGoBack}
+            aria-label={isUk ? 'Повернутися в меню' : 'Back to menu'}
             className="p-2 -ml-2 mr-2 text-gray-400 active:text-white transition-colors"
           >
             <ArrowLeft size={28} />
@@ -456,6 +480,7 @@ export default function Trainer() {
         ))}
         <button
           onClick={handleBackspace}
+          aria-label={isUk ? 'Стерти цифру' : 'Backspace'}
           className="bg-red-900/30 text-red-400 active:bg-red-900/60 text-2xl h-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform active:scale-95"
         >
           ⌫
@@ -468,6 +493,7 @@ export default function Trainer() {
         </button>
         <button
           onClick={generateProblem}
+          aria-label={isUk ? 'Пропустити приклад' : 'Skip problem'}
           className="bg-blue-900/30 text-blue-400 active:bg-blue-900/60 text-xl font-medium h-20 rounded-2xl flex items-center justify-center shadow-sm transition-transform active:scale-95"
         >
           {isUk ? 'Пропуск' : 'Skip'}
